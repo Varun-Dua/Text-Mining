@@ -1,0 +1,159 @@
+---
+title: "Assignement 3"
+author: "Varun Dua - 19230587"
+date: "01/04/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Part 1:   
+
+
+```{r}
+URL = "http://www.cs.cornell.edu/people/pabo/movie-review-data/rt-polaritydata.tar.gz"
+download.file(URL, "rt-polaritydata.tar.gz")
+untar("rt-polaritydata.tar.gz")
+library(readtext)
+library(quanteda)
+
+df_neg <- data.frame(sentence = readLines("./rt-polaritydata/rt-polarity.neg"), 
+                     stringsAsFactors = FALSE)
+df_neg['sentiment'] <- "neg"
+
+df_pos <- data.frame(sentence = readLines("./rt-polaritydata/rt-polarity.pos"), 
+                     stringsAsFactors = FALSE)
+df_pos['sentiment'] <- "pos"
+
+corp_movies <- corpus(rbind(df_neg, df_pos), text_field='sentence')
+
+toks_corp <- tokens(corp_movies, remove_punct = TRUE)
+
+nostop_corp_movies <- tokens_select(toks_corp, pattern = stopwords('en'), selection = 'remove')
+head(nostop_corp_movies)
+
+```
+
+### a) Frequency plot of top 15 words  
+
+```{r}
+
+df <- dfm(nostop_corp_movies)
+ts <- textstat_frequency(df)
+
+ts <- head(ts,15)
+library(ggplot2)
+fplot<- ggplot(data = ts, aes(ts$feature, ts$frequency)) + geom_line(group = 1) + labs(x = "Feature", y = "Frequency")
+print(ts)
+fplot
+
+```
+
+
+### b) Word Cloud of 50 most common words
+
+```{r}
+set.seed(132)
+textplot_wordcloud(df, max_words = 50)
+```
+
+
+### c) Grouped Word Cloud of 50 most common words in positive or negative sentences
+
+```{r}
+dfmat_grouped <- dfm(nostop_corp_movies, groups = "sentiment")
+set.seed(132)
+textplot_wordcloud(dfmat_grouped, comparison = TRUE, max_words = 50)
+```
+
+
+### d) Plot of Lexical diversity of 20 random sentences  
+
+```{r}
+library(dplyr)
+set.seed(1234)
+tstat_lexdiv <- textstat_lexdiv(df)
+sampled_df<- sample_n(tstat_lexdiv,20)
+splot<- ggplot(data = sampled_df, aes(sampled_df$document, sampled_df$TTR)) + geom_line(group = 1) + labs(x = "Document", y = "Frequency")
+splot
+```
+
+
+### e) Dendogram of hierarchical clustering of randomly selected 20 sentences   
+
+```{r}
+set.seed(123)
+cs<- corpus_sample(corp_movies, 20)
+toks_new <- tokens(cs)
+df <- dfm(toks_new, remove = stopwords('en'))
+dist_mat <- as.dist(textstat_dist(df))
+clust<- hclust(dist_mat)
+plot(clust, xlab = "Distance", ylab = NULL)
+```
+
+
+## Part 2:   
+
+```{r}
+library(quanteda)
+library(quanteda.corpora)
+library(caret)
+sentiment <- tokens_lookup(nostop_corp_movies, dictionary = data_dictionary_LSD2015[1:2], 
+                           exclusive = FALSE, nested_scope = "dictionary")
+sent_mat<-dfm(sentiment)
+sent_df<- convert(sent_mat[,c("negative","positive")], to = "data.frame")
+sent_df<- cbind(sent_df, docvars(sent_mat))
+
+library(dplyr)
+sent_df<- mutate(sent_df, diff = positive - negative)
+sent_df$newSent<- with(sent_df, ifelse(diff>=0, "pos", "neg"))
+
+sent_df<- select(sent_df, c(sentiment, newSent))
+
+tab_class <- table(sent_df$sentiment, sent_df$newSent)
+
+tab_class
+
+confusionMatrix(tab_class, mode = "everything")
+```
+
+
+## Part 3:  
+
+```{r}
+
+library(quanteda)
+library(quanteda.textmodels)
+library(quanteda.corpora)
+library(caret)
+
+set.seed(300)
+id_train <- sample(1:10662, 7463, replace = FALSE)
+head(id_train, 10)
+
+corp_movies$id_numeric <- 1:ndoc(corp_movies)
+
+dfmat_training <- corpus_subset(corp_movies, id_numeric %in% id_train) %>%
+  dfm(remove = stopwords("english"), stem = TRUE)
+dfmat_test <- corpus_subset(corp_movies, !id_numeric %in% id_train) %>%
+  dfm(remove = stopwords("english"), stem = TRUE)
+tmod_nb <- textmodel_nb(dfmat_training, dfmat_training$sentiment)
+summary(tmod_nb)
+
+dfmat_matched <- dfm_match(dfmat_test, features = featnames(dfmat_training))
+
+actual_class <- dfmat_matched$sentiment
+predicted_class <- predict(tmod_nb, newdata = dfmat_matched)
+tab_class <- table(actual_class, predicted_class)
+
+tab_class
+
+confusionMatrix(tab_class, mode = "everything")
+
+```
+
