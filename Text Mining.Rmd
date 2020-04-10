@@ -1,6 +1,6 @@
 ---
-title: "Assignement 3"
-author: "Varun Dua - 19230587"
+title: "Text Mining"
+author: "Varun Dua"
 date: "01/04/2020"
 output:
   word_document: default
