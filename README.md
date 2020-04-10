@@ -1,7 +1,10 @@
 # Text-Mining
 
 Raw Code in File -  Text_Analysis.R
+
 Knitr Code in Text Mining.Rmd
+
+Visual Output in Text Mining.html
 
 PART 1.
 R script to download, extract and load the Sentence Polarity dataset v1.0 from [1]. The
